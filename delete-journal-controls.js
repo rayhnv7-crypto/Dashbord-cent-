@@ -1,7 +1,10 @@
 (() => {
   const JOURNAL_KEY = 'cent-journal';
   const HISTORY_KEY = 'cent-monthly-history';
-  const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; } };
+  const read = (key, fallback) => {
+    try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
+  };
+  const write = (key, value) => localStorage.setItem(key, JSON.stringify(value));
   const parseNumber = (value) => {
     let s = String(value ?? '').replace(/[^0-9,.-]/g, '').trim();
     if (!s) return 0;
@@ -30,6 +33,20 @@
     ) || null;
   }
 
+  function recalculateHistory(month, journal, history) {
+    const h = history.find(x => x.month === month);
+    if (!h) return history;
+    const rows = journal.filter(x => (x.month || String(x.date || '').slice(0, 7)) === month);
+    const realized = rows.reduce((s, x) => s + parseNumber(x.pl), 0);
+    const wins = rows.filter(x => parseNumber(x.pl) > 0).length;
+    h.realized = realized;
+    h.endingCent = parseNumber(h.startCent) + realized;
+    h.trades = rows.length;
+    h.totalLot = rows.reduce((s, x) => s + parseNumber(x.lot), 0);
+    h.winrate = rows.length ? (wins / rows.length * 100).toFixed(1) : '0.0';
+    return history;
+  }
+
   function renderDeleteButtons() {
     const body = document.getElementById('body');
     if (!body) return;
@@ -40,37 +57,34 @@
       const cells = [...row.cells];
       if (cells.length < 6) return;
       const actionCell = cells[cells.length - 1];
-      if (!actionCell) return;
-
-      let button = actionCell.querySelector('[data-delete-journal]');
-      if (button) return;
+      if (!actionCell || actionCell.querySelector('.btn-delete')) return;
 
       const entry = findEntry(row, m);
       if (!entry) return;
 
-      button = document.createElement('button');
+      const button = document.createElement('button');
       button.type = 'button';
       button.dataset.deleteJournal = entry.id || `${entry.date}-${entry.entry}-${entry.createdAt || ''}`;
       button.className = 'btn-icon btn-delete';
       button.textContent = '🗑 Hapus';
-      button.title = 'Hapus entry ini';
-      button.style.display = 'inline-block';
-      button.style.visibility = 'visible';
-      button.style.cursor = 'pointer';
+      button.title = 'Hapus entry ini dan hitung ulang jurnal bulan tersebut';
 
       button.addEventListener('click', () => {
         const label = `Entry #${entry.entry || '?'} pada ${entry.date || m}`;
-        if (!window.confirm(`Hapus ${label}? Data ini akan hilang dari jurnal dan perhitungan bulan aktif.`)) return;
+        if (!window.confirm(`Hapus ${label}? Data ini akan hilang dari jurnal dan perhitungan bulan.`)) return;
+
         const journal = read(JOURNAL_KEY, []);
-        const next = entry.id ? journal.filter(x => x.id !== entry.id) : journal.filter(x => x !== entry);
-        localStorage.setItem(JOURNAL_KEY, JSON.stringify(next));
+        const next = entry.id
+          ? journal.filter(x => x.id !== entry.id)
+          : journal.filter(x => x !== entry);
+        const history = read(HISTORY_KEY, []);
+        write(JOURNAL_KEY, next);
+        write(HISTORY_KEY, recalculateHistory(m, next, history));
         window.location.reload();
       });
+
       actionCell.appendChild(button);
     });
-
-    const note = document.getElementById('lockedNote');
-    if (note) note.textContent = 'Target bulan yang sudah ditutup tetap terkunci. Jika ada jurnal yang salah input, entry tersebut tetap dapat dihapus lewat tombol 🗑 Hapus di tabel jurnal.';
   }
 
   window.addEventListener('DOMContentLoaded', () => {
