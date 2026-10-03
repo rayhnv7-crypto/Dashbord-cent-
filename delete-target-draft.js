@@ -1,3 +1,4 @@
+// Force Vercel production redeploy from GitHub main.
 (() => {
   const DRAFT_KEY = 'cent-monthly-drafts';
   const HISTORY_KEY = 'cent-monthly-history';
