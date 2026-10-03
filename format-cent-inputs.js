@@ -3,7 +3,7 @@
     const text = String(value ?? '').trim();
     if (!text) return 0;
     if (text.includes(',')) return Number(text.replace(/\./g, '').replace(',', '.')) || 0;
-    if (/^\d{1,3}(\.\d{3})+$/.test(text)) return Number(text.replace(/\./g, '')) || 0;
+    if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) return Number(text.replace(/\./g, '')) || 0;
     return Number(text) || 0;
   };
   const formatID = (value, decimals) => parseID(value).toLocaleString('id-ID', {
@@ -46,8 +46,15 @@
       }
     });
 
-    // The main application reads these values with Number(). When the browser
-    // blurs a formatted field before a button click, Number('1.685,00') is NaN.
+    // Keep the application's Number()-based calculations safe while a field is displayed
+    // with Indonesian separators such as 1.685,81 or 17.932.
+    document.addEventListener('input', (event) => {
+      const field = event.target;
+      const config = fields.find(([target]) => target === field);
+      if (!config || field.value === '') return;
+      field.value = String(parseID(field.value));
+    }, true);
+
     // Normalize just before the app's click handler runs, then restore display format.
     document.addEventListener('click', (event) => {
       const button = event.target.closest('#saveTarget, #startMonth');
