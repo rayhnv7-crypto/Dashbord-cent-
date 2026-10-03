@@ -1,4 +1,12 @@
 (() => {
+  function parseID(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return 0;
+    if (text.includes(',')) return Number(text.replace(/\./g, '').replace(',', '.')) || 0;
+    if (/^-?\d{1,3}(\.\d{3})+$/.test(text)) return Number(text.replace(/\./g, '')) || 0;
+    return Number(text) || 0;
+  }
+
   function fmt(value, digits = 2) {
     return Number(value || 0).toLocaleString('id-ID', {
       minimumFractionDigits: digits,
@@ -12,19 +20,19 @@
 
   function refreshFormula() {
     const get = id => document.getElementById(id);
-    const start = Number(get('startCent')?.value || 0);
-    const rate = Number(get('rate')?.value || 0);
-    const targetRpText = get('targetRp')?.value || '0';
-    const targetRp = Number(String(targetRpText).replace(/\./g, '').replace(/[^0-9-]/g, '')) || 0;
-    const current = Number(get('current')?.value || 0);
-    const target = Number(get('target')?.value || 0);
+    const start = parseID(get('startCent')?.value);
+    const rate = parseID(get('rate')?.value);
+    const targetRp = parseID(get('targetRp')?.value);
+    const current = parseID(get('current')?.value);
+    const target = parseID(get('target')?.value);
     const realized = current - start;
 
     const startUsd = start / 100;
     const startRp = startUsd * rate;
     const currentUsd = current / 100;
     const currentRp = currentUsd * rate;
-    const profitRp = (realized / 100) * rate;
+    const profitUsd = realized / 100;
+    const profitRp = profitUsd * rate;
 
     const f1 = get('f1');
     const f2 = get('f2');
@@ -36,7 +44,7 @@
       ? idr(targetRp, 0) + ' ÷ ' + idr(rate, 0) + ' × 100 = ' + fmt(target) + ' CENT'
       : 'Target Rupiah ÷ Kurs USD/IDR × 100 = Target CENT';
 
-    f2.textContent = start > 0
+    f2.textContent = start > 0 && rate > 0
       ? fmt(start) + ' CENT ÷ 100 = $' + fmt(startUsd, 2) + ' → ' + idr(startRp, 2)
       : 'Modal awal CENT ÷ 100 = USD → USD × Kurs = Rupiah';
 
@@ -45,8 +53,11 @@
       : 'Current CENT ÷ 100 = USD → USD × Kurs = Rupiah';
 
     f4.textContent = realized !== 0 && rate > 0
-      ? '(' + fmt(current) + ' − ' + fmt(start) + ') CENT = ' + (realized >= 0 ? '+' : '') + fmt(realized) + ' CENT → ' + (profitRp >= 0 ? '+' : '') + idr(profitRp, 2)
-      : 'Profit / Rugi = Current CENT − Modal Awal CENT';
+      ? '(' + fmt(current) + ' − ' + fmt(start) + ') CENT = ' +
+        (realized >= 0 ? '+' : '') + fmt(realized) + ' CENT → ' +
+        (profitUsd >= 0 ? '+' : '') + '$' + fmt(profitUsd, 2) + ' → ' +
+        (profitRp >= 0 ? '+' : '') + idr(profitRp, 2)
+      : 'Profit / Rugi = Current CENT − Modal Awal CENT → CENT ÷ 100 = USD → USD × Kurs = Rupiah';
   }
 
   window.addEventListener('DOMContentLoaded', () => {
